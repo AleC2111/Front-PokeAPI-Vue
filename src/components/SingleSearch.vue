@@ -1,0 +1,251 @@
+<script setup>
+// Usar Promise.all para los movimientos
+// Línea evolutiva
+import { ref } from 'vue'
+
+const search_bar = ref(null)
+const name = ref(null)
+const pokedex_id = ref(null)
+const image = ref(null)
+const types = ref(null)
+const abilities = ref(null)
+const height_weight = ref(null)
+const move_list = ref(null)
+const shiny_toggle = ref(null)
+const stats_graph = ref(null)
+
+let currentData = {}
+
+function parseData(data){
+    let id = data.id
+    let pokemonName = data.name
+    let stats = []
+    for (let i=0; i<data.stats.length; i++){
+        stats.push(data.stats[i].base_stat)
+    }
+    let abilitiesData = []
+    for (let i=0; i<data.abilities.length; i++){
+        abilitiesData.push(data.abilities[i].ability.name)
+    }
+    let typesData = []
+    for (let i=0; i<data.types.length; i++){
+        typesData.push(data.types[i].type.name)
+    }
+    let height = data.height / 10
+    let weight = data.weight / 10
+    let moves = data.moves
+    let default_image = data.sprites.front_default
+    let shiny_image = data.sprites.front_shiny
+
+    currentData = {
+        "id": id,
+        "name": pokemonName,
+        "base_stats": stats,
+        "abilities": abilitiesData,
+        "types": typesData,
+        "height": height,
+        "weight": weight,
+        "moves": moves,
+        "default_image": default_image,
+        "shiny_image": shiny_image,
+    }
+    return currentData
+}
+
+function changeAbilitiesUI(abilities){
+    let finalText = "Habilidades: "
+    for (let i=0; i<abilities.length; i++){
+        if (i<abilities.length-1){
+            finalText = finalText+abilities[i]+", "
+        }
+        else{
+            finalText = finalText+abilities[i]
+        }
+    }
+    return finalText
+}
+
+function statsGraph(ctx, baseStats){
+    const statNames = ["HP", "ATK", "DEF", "SP. ATK", "SP. DEF", "SPD"]
+    const width = ctx.canvas.width
+    const height = ctx.canvas.height
+    
+    ctx.clearRect(0, 0, width, height)
+    const margin = 5
+    const barHeight = (height - margin*2)
+    const maxValue = 255
+
+    baseStats.forEach((statValue, i) => {
+        const barWidth = (statValue / maxValue) * (width - margin*20)
+        const x = width - margin - barWidth
+        const y = (margin + i * 20)+10
+
+        if (statValue<40) ctx.fillStyle = "#c6001a";
+        else if (statValue<60) ctx.fillStyle = "#fd5441";
+        else if (statValue<80) ctx.fillStyle = "#ff752b";
+        else if (statValue<100) ctx.fillStyle = "#fffb2b";
+        else if (statValue<130) ctx.fillStyle = "#64ff2b";
+        else if (statValue<150) ctx.fillStyle = "#02c819";
+        else if (statValue<180) ctx.fillStyle = "#27ff90";
+        else ctx.fillStyle = "#27edff";
+        ctx.fillRect(x, y, barWidth, barHeight * 0.1)
+
+        ctx.fillStyle = "#010101"
+        ctx.fillText(statNames[i]+": "+statValue, x - 65, y+10)   
+    });
+}
+
+function changeMoveList(moveData, movesContainer){
+    movesContainer.innerHTML = ""
+
+    moveData.forEach((move, i) => {
+        setTimeout(async () => {
+            try {
+                const response = await fetch("https://pokeapi.co/api/v2/move/"+move.move.name)
+                if (!response.ok){
+                    throw new Error("Response status: "+response.status);
+                }
+                let data = await response.json()
+
+                let moveElementName = document.createElement("div")
+                moveElementName.textContent = move.move.name
+                movesContainer.appendChild(moveElementName)
+
+                let parsedMove = document.createElement("div")
+                parsedMove.textContent = "Clase de daño: "+data.damage_class.name+" Poder base: "+data.power+" Precision: "+data.accuracy+" Prioridad: "+data.priority
+                movesContainer.appendChild(parsedMove)
+                if (data.effect_entries[1].effect){
+                    let moveDescription = document.createElement("div")
+                    moveDescription.textContent = data.effect_entries[1].effect
+                    movesContainer.appendChild(moveDescription)
+                } else {
+                    let moveDescription = document.createElement("div")
+                    moveDescription.textContent = "Empty..."
+                    movesContainer.appendChild(moveDescription)
+                }
+
+                let blank = document.createElement("hr")
+                movesContainer.appendChild(blank)
+            } catch (error) {
+                alert("Error: "+ error.message)
+                console.log("Error: "+error.message)
+            }
+        }, 1000 * (i+1));
+    })
+}
+
+function changeShiny(){
+    if (!shiny_toggle.value.checked){
+        image.value.src = currentData.default_image
+    } else {
+        image.value.src = currentData.shiny_image
+    }
+}
+
+function changeUI(parsed){
+    const canvas = stats_graph.value
+    const ctx = canvas.getContext("2d")
+
+    name.value.textContent = parsed.name.toUpperCase()
+    pokedex_id.value.textContent = "Id: "+parsed.id
+    changeShiny()
+    types.value.textContent = parsed.types
+    abilities.value.textContent = changeAbilitiesUI(parsed.abilities)
+    statsGraph(ctx, parsed.base_stats)
+    height_weight.value.textContent = "Altura: "+parsed.height+" m, Peso: "+parsed.weight+" kg"
+    changeMoveList(parsed.moves, move_list.value)
+}
+
+async function startSearch() {
+    try {
+        let pokemonName = search_bar.value.value.toLowerCase()
+
+        const response = await fetch("https://pokeapi.co/api/v2/pokemon/"+pokemonName)
+        if (!response.ok){
+            throw new Error("Response status: "+response.status);
+        }
+        let data = await response.json()
+        let parsed = parseData(data)
+
+        changeUI(parsed)
+    } catch (error) {
+        alert("Error: "+ error.message)
+        console.log("Error: "+error.message)
+    }
+}
+</script>
+
+<template>
+    <h2>Buscador de datos de Pokemon</h2>
+    <input ref="search_bar" placeholder="Busca por nombre o id..." value="">
+    <button id="confirm-single" @click="startSearch">Confirmar</button>
+    <div class="text-container" style="max-width: 20%;">
+        Shiny:
+        <input ref="shiny_toggle" type="checkbox" @click="changeShiny">
+    </div>
+
+    <div id="general-info">
+        <h3 ref="name" style="margin:4px;">Nombre</h3>
+        <h4 ref="pokedex_id" style="margin:4px;">Id</h4>
+        <img ref="image" alt="Imagen de Pokemon" src="">
+            
+        <div id="pokemon-info">
+            <div class="text-container" ref="types">Tipos: </div>
+            <div class="text-container" ref="abilities">Habilidades: </div>
+            <hr>
+            <div class="text-container" ref="base-stats">Estadisticas: </div>
+            <div class="text-container">
+            <canvas ref="stats_graph" width="400" height="150"></canvas>
+            </div>
+            <div class="text-container" ref="height_weight">Peso y Altura: </div>
+        </div>
+    </div>
+
+    <h5>Movimientos</h5>
+    <div id="move-list" ref="move_list"></div>
+</template>
+
+<style scoped>
+img {
+    min-width: 20%;
+    min-height: 20%;
+    margin: 10px;
+}
+input {
+    margin: 6px;
+    border-radius: 3px;
+}
+button {
+    background-color: #f76998;
+    margin: 5px;
+    border-radius: 5px;
+    transition: scale 0.2s ease-in;
+}
+button:hover {
+    cursor: pointer;
+    scale: 1.1;
+}
+
+#general-info {
+    align-items: center; 
+    justify-content: center; 
+    display: flex;
+}
+
+.text-container {
+    background-color: #feffd7;
+    color: black;
+    margin: 4px;
+    padding: 8px;
+    display: flex;
+    border-radius: 5px;
+}
+
+#move-list {
+    background-color: #feffd7;
+    color: black;
+    margin: 4px;
+    padding: 8px;
+    border-radius: 5px;
+}
+</style>
