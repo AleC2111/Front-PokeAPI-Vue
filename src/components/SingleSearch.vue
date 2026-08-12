@@ -1,6 +1,4 @@
 <script setup>
-// Usar Promise.all para los movimientos
-// Línea evolutiva
 import { ref } from 'vue'
 
 const search_bar = ref(null)
@@ -14,7 +12,8 @@ const move_list = ref(null)
 const shiny_toggle = ref(null)
 const stats_graph = ref(null)
 
-let currentData = {}
+let currentData = {default_image: "/default-img.jpg", shiny_image: "/shiny-img.jpg"}
+let loading = false
 
 function parseData(data){
     let id = data.id
@@ -76,7 +75,7 @@ function statsGraph(ctx, baseStats){
     const maxValue = 255
 
     baseStats.forEach((statValue, i) => {
-        const barWidth = (statValue / maxValue) * (width - margin*20)
+        const barWidth = (statValue / maxValue) * (width - margin*10)
         const x = width - margin - barWidth
         const y = (margin + i * 20)+10
 
@@ -114,13 +113,13 @@ function changeMoveList(moveData, movesContainer){
                 let parsedMove = document.createElement("div")
                 parsedMove.textContent = "Clase de daño: "+data.damage_class.name+" Poder base: "+data.power+" Precision: "+data.accuracy+" Prioridad: "+data.priority
                 movesContainer.appendChild(parsedMove)
-                if (data.effect_entries[1].effect){
+                if (data.effect_entries.length !== 0){
                     let moveDescription = document.createElement("div")
                     moveDescription.textContent = data.effect_entries[1].effect
                     movesContainer.appendChild(moveDescription)
                 } else {
                     let moveDescription = document.createElement("div")
-                    moveDescription.textContent = "Empty..."
+                    moveDescription.textContent = "No hay descripción"
                     movesContainer.appendChild(moveDescription)
                 }
 
@@ -176,39 +175,47 @@ async function startSearch() {
 </script>
 
 <template>
-    <h2>Buscador de datos de Pokemon</h2>
-    <input ref="search_bar" placeholder="Busca por nombre o id..." value="">
-    <button id="confirm-single" @click="startSearch">Confirmar</button>
-    <div class="text-container" style="max-width: 20%;">
-        Shiny:
-        <input ref="shiny_toggle" type="checkbox" @click="changeShiny">
-    </div>
-
-    <div id="general-info">
-        <h3 ref="name" style="margin:4px;">Nombre</h3>
-        <h4 ref="pokedex_id" style="margin:4px;">Id</h4>
-        <img ref="image" alt="Imagen de Pokemon" src="">
-            
-        <div id="pokemon-info">
-            <div class="text-container" ref="types">Tipos: </div>
-            <div class="text-container" ref="abilities">Habilidades: </div>
-            <hr>
-            <div class="text-container" ref="base-stats">Estadisticas: </div>
-            <div class="text-container">
-            <canvas ref="stats_graph" width="400" height="150"></canvas>
+    <div>
+        <h2>Buscador de datos de Pokemon</h2>
+        <div class="text-container">
+            <input ref="search_bar" placeholder="Busca por nombre o id..." value="">
+            <button id="confirm-single" @click="startSearch">Confirmar</button>
+            <div class="text-container" style="max-width: 30%;">
+                Shiny:
+                <input ref="shiny_toggle" type="checkbox" @click="changeShiny">
             </div>
-            <div class="text-container" ref="height_weight">Peso y Altura: </div>
+        </div>
+
+        <div class="text-container" v-if="loading">Cargando datos...</div>
+        <div id="general-info" v-else>
+            <h3 ref="name" style="margin:4px;">Nombre</h3>
+            <h4 ref="pokedex_id" style="margin:4px;">Id</h4>
+            <img ref="image" alt="Imagen de Pokemon" src="/default-img.jpg">
+            
+            <div id="pokemon-info">
+                <div class="text-container" ref="types">Tipos: </div>
+                <div class="text-container" ref="abilities">Habilidades: </div>
+                <hr>
+                <div class="text-container" ref="base-stats">Estadisticas: </div>
+                <div class="text-container" >
+                    <canvas ref="stats_graph" width="200" height="150"></canvas>
+                </div>
+                <div class="text-container" ref="height_weight">Peso y Altura: </div>
+            </div>
+        </div>
+        <div>
+            <h5>Movimientos</h5>
+            <div id="move-list" ref="move_list"></div>
         </div>
     </div>
-
-    <h5>Movimientos</h5>
-    <div id="move-list" ref="move_list"></div>
 </template>
 
 <style scoped>
 img {
     min-width: 20%;
     min-height: 20%;
+    max-width: 20%;
+    max-height: 20%;
     margin: 10px;
 }
 input {
@@ -247,5 +254,28 @@ button:hover {
     margin: 4px;
     padding: 8px;
     border-radius: 5px;
+    display: block;
+}
+
+@media screen and (max-width: 480px){
+    img {
+        min-width: 40%;
+        min-height: 40%;
+        max-width: 40%;
+        max-height: 40%;
+        margin: 5px;
+    }
+    .text-container {
+        margin: 4px;
+        padding: 8px;
+        display: inline-block;
+        border-radius: 5px;
+        min-width: 20%;
+    }
+    #general-info {
+        align-items: normal; 
+        justify-content: inherit; 
+        display: inline-block;
+    }
 }
 </style>

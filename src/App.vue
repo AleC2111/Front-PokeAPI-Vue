@@ -2,13 +2,17 @@
 import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
 
-//Fase 2
-// Mostrar cargando try{ Carga... }catch{ Error... }finally{ ... }
-// Diseño movil
-// Placeholders para las imágenes
-// Comparar 2 Pokemon
+// Mostrar cargando (Probar)
+// Comparar 2 Pokemon (Probar)
 
-// Búsqueda con debounce
+// Usar 'watch' para tener elementos reactivos
+// Barra de búsqueda con debounce
+// Paginación
+// Buscar el pokemon al hacer click encima en la lista
+// Usar useFetch
+// Usar Promise.all(array.map((move) => fetch(url+move))) para los movimientos
+// Línea evolutiva
+// Bookmarks de favoritos
 // Permita nombres sin tener que usar - (Formas regionales, megas, etc)
 </script>
 
@@ -56,7 +60,7 @@ nav a.router-link-exact-active:hover {
 
 nav a {
   display: inline-block;
-  padding: 0 1rem;
+  padding: 0 4px;
   border-left: 1px solid var(--color-border);
 }
 
