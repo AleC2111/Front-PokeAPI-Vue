@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
+import { useFetch } from '@vueuse/core'
 
 const list_content = ref(null)
 const offset_option = ref('')
@@ -43,12 +44,12 @@ function checkTypeExists(typeSearching) {
   return exists
 }
 
-function existsPreviousOrNext(offset, limit){
-  if (offset-limit < 0) previousPage.value = false;
-  else previousPage.value = true;
+function existsPreviousOrNext(offset, limit) {
+  if (offset - limit < 0) previousPage.value = false
+  else previousPage.value = true
 
-  if (offset+limit > maxCount) nextPage.value = false;
-  else nextPage.value = true;
+  if (offset + limit > maxCount) nextPage.value = false
+  else nextPage.value = true
 }
 
 function parseData(data, offset, limit) {
@@ -89,39 +90,23 @@ function changeUI(parsed, offset) {
 }
 
 async function startSimpleSearch(offset = 0, limit = 20) {
-  try {
-    let queries = 'offset=' + offset + '&limit=' + limit
-    const response = await fetch('https://pokeapi.co/api/v2/pokemon/?' + queries)
-    if (!response.ok) {
-      throw new Error('Response status: ' + response.status)
-    }
-    let data = await response.json()
-    let parsed = parseData(data, offset, limit)
+  let queries = 'offset=' + offset + '&limit=' + limit
+  const { data, error, isFetching } = await useFetch(
+    'https://pokeapi.co/api/v2/pokemon/?' + queries,
+  )
+  let parsed = parseData(JSON.parse(data.value), offset, limit)
 
-    changeUI(parsed, offset)
-  } catch (error) {
-    alert('Error: ' + error.message)
-    console.log('Error: ' + error.message)
-  }
+  changeUI(parsed, offset)
 }
 
 async function startTypeSearch(type, offset = 0, limit = 20) {
-  try {
-    const response = await fetch('https://pokeapi.co/api/v2/type/' + type)
-    if (!response.ok) {
-      throw new Error('Response status: ' + response.status)
-    }
-    let data = await response.json()
-    let parsed = parseTypeData(data, offset, limit)
+  const { data, error, isFetching } = await useFetch('https://pokeapi.co/api/v2/type/' + type)
+  let parsed = parseTypeData(JSON.parse(data.value), offset, limit)
 
-    changeUI(parsed, offset)
-  } catch (error) {
-    alert('Error: ' + error.message)
-    console.log('Error: ' + error.message)
-  }
+  changeUI(parsed, offset)
 }
 
-function searchParameters(offset='', typeSearching='') {
+function searchParameters(offset = '', typeSearching = '', limit = 20) {
   try {
     if (offset === null || offset === '' || offset === NaN) {
       offset = 0
@@ -138,8 +123,8 @@ function searchParameters(offset='', typeSearching='') {
     globalOffset = offset
     globalType = typeSearching
 
-    if (typeSearching === '' || typeSearching === null) startSimpleSearch(offset)
-    else startTypeSearch(typeSearching, offset)
+    if (typeSearching === '' || typeSearching === null) startSimpleSearch(offset, limit)
+    else startTypeSearch(typeSearching, offset, limit)
   } catch (error) {
     alert('Error: ' + error.message)
     console.log('Error: ' + error.message)
@@ -148,12 +133,16 @@ function searchParameters(offset='', typeSearching='') {
   }
 }
 
-function searchNextPage(){
-  searchParameters(globalOffset+20, globalType)
+function searchNextPage() {
+  searchParameters(globalOffset + 20, globalType)
 }
 
-function searchPreviousPage(){
-  searchParameters(globalOffset-20, globalType)
+function searchPreviousPage() {
+  searchParameters(globalOffset - 20, globalType)
+}
+
+function loadFirstGen() {
+  searchParameters(0, '', 151)
 }
 
 onMounted(() => {
@@ -171,8 +160,10 @@ watch([offset_option, types_option], (newValues, _) => {
 
 <template>
   <h2>Busqueda por lista</h2>
-  <button ref="previous_button" v-if="previousPage===true" @click="searchPreviousPage">Anterior</button>
-  <button ref="next_button" v-if="nextPage===true" @click="searchNextPage">Siguiente</button>
+  <button ref="previous_button" v-if="previousPage === true" @click="searchPreviousPage">
+    Anterior
+  </button>
+  <button ref="next_button" v-if="nextPage === true" @click="searchNextPage">Siguiente</button>
   <div ref="options" class="text-container" id="general-info">
     <input
       id="offset"
@@ -181,6 +172,7 @@ watch([offset_option, types_option], (newValues, _) => {
       placeholder="Id de inicio de la busqueda"
     />
     <input id="types" v-model="types_option" placeholder="Tipo a buscar" />
+    <button ref="first_gen" @click="loadFirstGen">Cargar 1ra Generación</button>
   </div>
 
   <hr />
@@ -220,17 +212,17 @@ button:hover {
   min-width: 50%;
 }
 
-@media screen and (max-width: 480px){
-    .text-container {
-        margin: 4px;
-        padding: 8px;
-        display: inline-block;
-        min-width: 75%;
-    }
-    #general-info {
-        align-items: normal; 
-        justify-content: inherit; 
-        display: inline-block;
-    }
+@media screen and (max-width: 480px) {
+  .text-container {
+    margin: 4px;
+    padding: 8px;
+    display: inline-block;
+    min-width: 75%;
+  }
+  #general-info {
+    align-items: normal;
+    justify-content: inherit;
+    display: inline-block;
+  }
 }
 </style>

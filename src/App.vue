@@ -2,14 +2,14 @@
 import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
 
-// Usar useFetch
 // Bookmarks de favoritos con FastAPI
 
 //Extra
 // Buscar el pokemon al hacer hover en la lista
+// Usar Promise.all para los movimientos
 // Agregar metodo evolutivo a las líneas evolutivas
 // Agregar casos para formas alternativas en las líneas evolutivas (megas, regionales, etc)
-// Permita nombres sin tener que usar - (Formas regionales, megas, etc)
+// Permita nombres sin tener que usar - (megas, regionales, etc)
 </script>
 
 <template>
