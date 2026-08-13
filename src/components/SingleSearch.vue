@@ -1,7 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 
-const search_bar = ref(null)
+const search_bar = ref('')
 const name = ref(null)
 const pokedex_id = ref(null)
 const image = ref(null)
@@ -11,9 +11,11 @@ const height_weight = ref(null)
 const move_list = ref(null)
 const shiny_toggle = ref(null)
 const stats_graph = ref(null)
+const evolution_line = ref(null)
 
 let currentData = {default_image: "/default-img.jpg", shiny_image: "/shiny-img.jpg"}
-let loading = false
+let loading = ref(false)
+let timer = null
 
 function parseData(data){
     let id = data.id
@@ -97,39 +99,37 @@ function statsGraph(ctx, baseStats){
 function changeMoveList(moveData, movesContainer){
     movesContainer.innerHTML = ""
 
-    moveData.forEach((move, i) => {
-        setTimeout(async () => {
-            try {
-                const response = await fetch("https://pokeapi.co/api/v2/move/"+move.move.name)
-                if (!response.ok){
-                    throw new Error("Response status: "+response.status);
-                }
-                let data = await response.json()
-
-                let moveElementName = document.createElement("div")
-                moveElementName.textContent = move.move.name
-                movesContainer.appendChild(moveElementName)
-
-                let parsedMove = document.createElement("div")
-                parsedMove.textContent = "Clase de daño: "+data.damage_class.name+" Poder base: "+data.power+" Precision: "+data.accuracy+" Prioridad: "+data.priority
-                movesContainer.appendChild(parsedMove)
-                if (data.effect_entries.length !== 0){
-                    let moveDescription = document.createElement("div")
-                    moveDescription.textContent = data.effect_entries[1].effect
-                    movesContainer.appendChild(moveDescription)
-                } else {
-                    let moveDescription = document.createElement("div")
-                    moveDescription.textContent = "No hay descripción"
-                    movesContainer.appendChild(moveDescription)
-                }
-
-                let blank = document.createElement("hr")
-                movesContainer.appendChild(blank)
-            } catch (error) {
-                alert("Error: "+ error.message)
-                console.log("Error: "+error.message)
+    moveData.forEach(async (move, i) => {
+        try {
+            const response = await fetch("https://pokeapi.co/api/v2/move/"+move.move.name)
+            if (!response.ok){
+                throw new Error("Response status: "+response.status);
             }
-        }, 1000 * (i+1));
+            let data = await response.json()
+
+            let moveElementName = document.createElement("div")
+            moveElementName.textContent = move.move.name
+            movesContainer.appendChild(moveElementName)
+
+            let parsedMove = document.createElement("div")
+            parsedMove.textContent = "Clase de daño: "+data.damage_class.name+" Poder base: "+data.power+" Precision: "+data.accuracy+" Prioridad: "+data.priority
+            movesContainer.appendChild(parsedMove)
+            if (data.effect_entries.length !== 0){
+                let moveDescription = document.createElement("div")
+                moveDescription.textContent = data.effect_entries[1].effect
+                movesContainer.appendChild(moveDescription)
+            } else {
+                let moveDescription = document.createElement("div")
+                moveDescription.textContent = "No hay descripción"
+                movesContainer.appendChild(moveDescription)
+            }
+
+            let blank = document.createElement("hr")
+            movesContainer.appendChild(blank)
+        } catch (error) {
+            alert("Error: "+ error.message)
+            console.log("Error: "+error.message)
+        }
     })
 }
 
@@ -141,7 +141,74 @@ function changeShiny(){
     }
 }
 
-function changeUI(parsed){
+function parsedEvolution(evolutionData){
+    let baseForm = []
+    let firstPhaseForm = []
+    let lastPhaseForm = []
+
+    baseForm.push(evolutionData["species"]["name"])
+    if (Object.hasOwn(evolutionData, "evolves_to")){
+        for (let i = 0; i < evolutionData["evolves_to"].length; i++) {
+            firstPhaseForm.push(evolutionData["evolves_to"][i]["species"]["name"])
+            if (Object.hasOwn(evolutionData["evolves_to"][i], "evolves_to")){
+                for (let j = 0; j < evolutionData["evolves_to"][i]["evolves_to"].length; j++) {
+                    lastPhaseForm.push(evolutionData["evolves_to"][i]["evolves_to"][j]["species"]["name"])
+                }
+            }
+        }
+    }
+
+    let fullLine = [baseForm]
+    if (firstPhaseForm.length>0) fullLine.push(firstPhaseForm);
+    if (lastPhaseForm.length>0) fullLine.push(lastPhaseForm);
+    console.log(fullLine)
+
+    return formatEvolutionLine(fullLine)
+}
+
+function formatEvolutionLine(fullLine){
+    let formattedLine = ""
+    for (let i = 0; i < fullLine.length; i++) {
+        let separator = " -> "
+        if (fullLine[i].length>1){
+            separator = ", "
+        }
+        for (let j = 0; j < fullLine[i].length; j++) {
+            if (i===fullLine.length-1 && j===fullLine[i].length-1){
+                formattedLine = formattedLine+fullLine[i][j]
+            } else{
+                formattedLine = formattedLine+fullLine[i][j]+separator
+            }
+        }
+    }
+
+    console.log(formattedLine)
+    return formattedLine
+}
+
+async function updateEvolutionLine(pokemonName) {
+    try {
+        const response = await fetch("https://pokeapi.co/api/v2/pokemon-species/"+pokemonName)
+        if (!response.ok){
+            throw new Error("Response status: "+response.status);
+        }
+        let data = await response.json()
+        let evolutionChainUrl = data.evolution_chain.url
+
+        const responseEvolution = await fetch(evolutionChainUrl)
+        if (!responseEvolution.ok){
+            throw new Error("Response status: "+responseEvolution.status);
+        }
+        let evolutionData = await responseEvolution.json()
+
+        return parsedEvolution(evolutionData.chain)
+    } catch (error) {
+        alert("Error: "+ error.message)
+        console.log("Error: "+error.message)
+    } 
+}
+
+async function changeUI(parsed){
     const canvas = stats_graph.value
     const ctx = canvas.getContext("2d")
 
@@ -152,13 +219,12 @@ function changeUI(parsed){
     abilities.value.textContent = changeAbilitiesUI(parsed.abilities)
     statsGraph(ctx, parsed.base_stats)
     height_weight.value.textContent = "Altura: "+parsed.height+" m, Peso: "+parsed.weight+" kg"
+    evolution_line.value.textContent = await updateEvolutionLine(parsed.name)
     changeMoveList(parsed.moves, move_list.value)
 }
 
-async function startSearch() {
+async function startSearch(pokemonName) {
     try {
-        let pokemonName = search_bar.value.value.toLowerCase()
-
         const response = await fetch("https://pokeapi.co/api/v2/pokemon/"+pokemonName)
         if (!response.ok){
             throw new Error("Response status: "+response.status);
@@ -170,16 +236,25 @@ async function startSearch() {
     } catch (error) {
         alert("Error: "+ error.message)
         console.log("Error: "+error.message)
+    } finally {
+        loading.value = false
     }
 }
+
+watch(search_bar, (newValue, _) => {
+    loading.value = true
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+        startSearch(newValue.toLowerCase())
+    }, 1000)
+})
 </script>
 
 <template>
     <div>
         <h2>Buscador de datos de Pokemon</h2>
         <div class="text-container">
-            <input ref="search_bar" placeholder="Busca por nombre o id..." value="">
-            <button id="confirm-single" @click="startSearch">Confirmar</button>
+            <input v-model="search_bar" placeholder="Busca por nombre o id..." value="">
             <div class="text-container" style="max-width: 30%;">
                 Shiny:
                 <input ref="shiny_toggle" type="checkbox" @click="changeShiny">
@@ -187,7 +262,7 @@ async function startSearch() {
         </div>
 
         <div class="text-container" v-if="loading">Cargando datos...</div>
-        <div id="general-info" v-else>
+        <div id="general-info">
             <h3 ref="name" style="margin:4px;">Nombre</h3>
             <h4 ref="pokedex_id" style="margin:4px;">Id</h4>
             <img ref="image" alt="Imagen de Pokemon" src="/default-img.jpg">
@@ -197,11 +272,15 @@ async function startSearch() {
                 <div class="text-container" ref="abilities">Habilidades: </div>
                 <hr>
                 <div class="text-container" ref="base-stats">Estadisticas: </div>
-                <div class="text-container" >
+                <div class="text-container">
                     <canvas ref="stats_graph" width="200" height="150"></canvas>
                 </div>
                 <div class="text-container" ref="height_weight">Peso y Altura: </div>
             </div>
+        </div>
+        <div>
+            <h5>Línea evolutiva</h5>
+            <div ref="evolution_line" class="text-container"></div>
         </div>
         <div>
             <h5>Movimientos</h5>

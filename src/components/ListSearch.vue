@@ -1,9 +1,9 @@
 <script setup>
-import { ref, watchEffect } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 
 const list_content = ref(null)
-const offset_option = ref(null)
-const types_option = ref(null)
+const offset_option = ref('')
+const types_option = ref('')
 
 const availableTypes = [
   'fire',
@@ -26,9 +26,12 @@ const availableTypes = [
   'bug',
 ]
 const maxCount = 1351
-let nextPage = null
-let previousPage = null
-let loading = false
+let nextPage = ref(false)
+let previousPage = ref(false)
+let loading = ref(false)
+let timer = null
+let globalOffset = 0
+let globalType = ''
 
 function checkTypeExists(typeSearching) {
   let exists = false
@@ -40,9 +43,16 @@ function checkTypeExists(typeSearching) {
   return exists
 }
 
-function parseData(data) {
-  nextPage = data.next
-  previousPage = data.previous
+function existsPreviousOrNext(offset, limit){
+  if (offset-limit < 0) previousPage.value = false;
+  else previousPage.value = true;
+
+  if (offset+limit > maxCount) nextPage.value = false;
+  else nextPage.value = true;
+}
+
+function parseData(data, offset, limit) {
+  existsPreviousOrNext(offset, limit)
 
   let pokemonFound = []
   data.results.forEach((found) => {
@@ -53,6 +63,8 @@ function parseData(data) {
 }
 
 function parseTypeData(data, offset, limit) {
+  existsPreviousOrNext(offset, limit)
+
   let pokemonFound = []
   let sliced = data.pokemon.slice(offset, limit + offset)
   sliced.forEach((found) => {
@@ -84,7 +96,7 @@ async function startSimpleSearch(offset = 0, limit = 20) {
       throw new Error('Response status: ' + response.status)
     }
     let data = await response.json()
-    let parsed = parseData(data)
+    let parsed = parseData(data, offset, limit)
 
     changeUI(parsed, offset)
   } catch (error) {
@@ -109,22 +121,12 @@ async function startTypeSearch(type, offset = 0, limit = 20) {
   }
 }
 
-function searchParameters() {
+function searchParameters(offset='', typeSearching='') {
   try {
-    loading = true
-    let offset
-    let typeSearching 
-
-    if (offset_option.value === null || offset_option.value.value === '') {
+    if (offset === null || offset === '' || offset === NaN) {
       offset = 0
     } else {
-      offset = parseInt(offset_option.value.value)
-    }
-
-    if (types_option.value === null){
-      typeSearching = ''
-    } else {
-      typeSearching = types_option.value.value
+      offset = parseInt(offset)
     }
 
     if (offset < 0 || offset > maxCount || offset === NaN) {
@@ -133,6 +135,8 @@ function searchParameters() {
     if (!checkTypeExists(typeSearching) && typeSearching !== '' && typeSearching !== null) {
       throw new Error("Type doesn't exist")
     }
+    globalOffset = offset
+    globalType = typeSearching
 
     if (typeSearching === '' || typeSearching === null) startSimpleSearch(offset)
     else startTypeSearch(typeSearching, offset)
@@ -140,28 +144,43 @@ function searchParameters() {
     alert('Error: ' + error.message)
     console.log('Error: ' + error.message)
   } finally {
-    loading = false
+    loading.value = false
   }
 }
 
-watchEffect(() => {
+function searchNextPage(){
+  searchParameters(globalOffset+20, globalType)
+}
+
+function searchPreviousPage(){
+  searchParameters(globalOffset-20, globalType)
+}
+
+onMounted(() => {
   searchParameters()
+})
+
+watch([offset_option, types_option], (newValues, _) => {
+  loading.value = true
+  clearTimeout(timer)
+  timer = setTimeout(() => {
+    searchParameters(newValues[0], newValues[1])
+  }, 1000)
 })
 </script>
 
 <template>
   <h2>Busqueda por lista</h2>
-  <button ref="previous_button" v-if="previousPage != null">Anterior</button>
-  <button ref="next_button" v-if="nextPage != null">Siguiente</button>
+  <button ref="previous_button" v-if="previousPage===true" @click="searchPreviousPage">Anterior</button>
+  <button ref="next_button" v-if="nextPage===true" @click="searchNextPage">Siguiente</button>
   <div ref="options" class="text-container" id="general-info">
     <input
       id="offset"
-      ref="offset_option"
+      v-model="offset_option"
       type="integer"
       placeholder="Id de inicio de la busqueda"
     />
-    <input id="types" ref="types_option" placeholder="Tipo a buscar" />
-    <button ref="confirm" @click="searchParameters">Confirmar</button>
+    <input id="types" v-model="types_option" placeholder="Tipo a buscar" />
   </div>
 
   <hr />

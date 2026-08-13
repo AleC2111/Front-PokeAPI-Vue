@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import SingleSearchView from '../views/SingleSearchView.vue'
 import AboutView from '../views/AboutView.vue'
+import CompareSearchView from '../views/CompareSearchView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -14,6 +15,11 @@ const router = createRouter({
       path: '/single-search',
       name: 'single-search',
       component: SingleSearchView,
+    },
+    {
+      path: '/compare-search',
+      name: 'compare-search',
+      component: CompareSearchView,
     },
     {
       path: '/list-search',
