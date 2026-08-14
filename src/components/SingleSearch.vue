@@ -195,6 +195,9 @@ async function updateEvolutionLine(pokemonName) {
   const { data, error, isFetching } = await useFetch(
     'https://pokeapi.co/api/v2/pokemon-species/' + pokemonName,
   )
+  if (JSON.parse(data.value) === null || JSON.parse(data.value) === undefined || error) {
+    return pokemonName
+  }
   let evolutionChainUrl = JSON.parse(data.value).evolution_chain.url
 
   return await parsedEvolution(evolutionChainUrl)
