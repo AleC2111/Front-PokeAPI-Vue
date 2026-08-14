@@ -241,17 +241,32 @@ async function startSearch(pokemonName) {
 }
 
 const saved = ref(false)
+const removed = ref(false)
 const is_favorite = ref(false)
 function saveFavoritePokemon() {
-  currentData['favorite'] = true
-  is_favorite.value = true
-  localStorage.setItem(currentData.name, JSON.stringify(currentData))
-  saved.value = true
+  if (pokedex_id.value.textContent !== 'Id') {
+    if (currentData['favorite'] === true) {
+      currentData['favorite'] = false
+      is_favorite.value = false
+      saved.value = false
+      removed.value = true
+      localStorage.removeItem(currentData.name)
+    } else {
+      currentData['favorite'] = true
+      is_favorite.value = true
+      saved.value = true
+      removed.value = false
+      localStorage.setItem(currentData.name, JSON.stringify(currentData))
+    }
+  } else {
+    alert('Busca un Pokemon primero')
+  }
 }
 
 watch(search_bar, (newValue, _) => {
   loading.value = true
   saved.value = false
+  removed.value = false
   is_favorite.value = false
   clearTimeout(timer)
   timer = setTimeout(() => {
@@ -273,6 +288,7 @@ watch(search_bar, (newValue, _) => {
     </div>
 
     <h3 class="changing-container" v-if="loading">Cargando datos...</h3>
+    <h3 class="changing-container" v-if="removed">Eliminado!</h3>
     <h3 class="changing-container" v-if="saved">Guardado!</h3>
     <h3 class="changing-container" style="" v-if="is_favorite">Favorito</h3>
     <div id="general-info">
