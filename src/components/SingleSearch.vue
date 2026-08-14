@@ -50,6 +50,7 @@ function parseData(data) {
     moves: moves,
     default_image: default_image,
     shiny_image: shiny_image,
+    favorite: false,
   }
   return currentData
 }
@@ -217,22 +218,41 @@ async function changeUI(parsed) {
 
 async function startSearch(pokemonName) {
   try {
-    const { data, errorSearch, isFetching } = await useFetch(
-      'https://pokeapi.co/api/v2/pokemon/' + pokemonName,
-    )
-    let parsed = parseData(JSON.parse(data.value))
+    let parsed
+    if (localStorage.getItem(pokemonName)) {
+      console.log(pokemonName)
+      is_favorite.value = true
+      currentData = JSON.parse(localStorage.getItem(pokemonName))
+      parsed = currentData
+    } else {
+      const { data, error, isFetching } = await useFetch(
+        'https://pokeapi.co/api/v2/pokemon/' + pokemonName,
+      )
+      parsed = parseData(JSON.parse(data.value))
+    }
 
     changeUI(parsed)
   } catch (error) {
-    alert('Error: ' + error.message)
+    alert('Error: Ha ocurrido un error en la busqueda')
     console.log('Error: ' + error.message)
   } finally {
     loading.value = false
   }
 }
 
+const saved = ref(false)
+const is_favorite = ref(false)
+function saveFavoritePokemon() {
+  currentData['favorite'] = true
+  is_favorite.value = true
+  localStorage.setItem(currentData.name, JSON.stringify(currentData))
+  saved.value = true
+}
+
 watch(search_bar, (newValue, _) => {
   loading.value = true
+  saved.value = false
+  is_favorite.value = false
   clearTimeout(timer)
   timer = setTimeout(() => {
     startSearch(newValue.toLowerCase())
@@ -249,9 +269,12 @@ watch(search_bar, (newValue, _) => {
         Shiny:
         <input ref="shiny_toggle" type="checkbox" @click="changeShiny" />
       </div>
+      <button ref="save_favorite" @click="saveFavoritePokemon">Guardar en Favoritos</button>
     </div>
 
-    <div class="text-container" v-if="loading">Cargando datos...</div>
+    <h3 class="changing-container" v-if="loading">Cargando datos...</h3>
+    <h3 class="changing-container" v-if="saved">Guardado!</h3>
+    <h3 class="changing-container" style="" v-if="is_favorite">Favorito</h3>
     <div id="general-info">
       <h3 ref="name" style="margin: 4px">Nombre</h3>
       <h4 ref="pokedex_id" style="margin: 4px">Id</h4>
@@ -306,6 +329,17 @@ button:hover {
   align-items: center;
   justify-content: center;
   display: flex;
+}
+
+.changing-container {
+  background-color: #feffd7;
+  margin: 4px;
+  padding: 8px;
+  display: flex;
+  border-radius: 5px;
+  text-align: center;
+  justify-content: center;
+  color: rgb(188, 59, 182);
 }
 
 .text-container {

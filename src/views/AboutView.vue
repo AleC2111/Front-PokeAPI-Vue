@@ -1,6 +1,6 @@
 <template>
   <div class="about">
-    <h2>Acuerdate de llenar la descripción w</h2>
+    <h2>Pokedex con busqueda individual de lista y comparativa entre dos</h2>
   </div>
 </template>
 

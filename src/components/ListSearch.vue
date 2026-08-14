@@ -126,7 +126,7 @@ function searchParameters(offset = '', typeSearching = '', limit = 20) {
     if (typeSearching === '' || typeSearching === null) startSimpleSearch(offset, limit)
     else startTypeSearch(typeSearching, offset, limit)
   } catch (error) {
-    alert('Error: ' + error.message)
+    alert('Error: Ha ocurrido un error en la busqueda')
     console.log('Error: ' + error.message)
   } finally {
     loading.value = false
