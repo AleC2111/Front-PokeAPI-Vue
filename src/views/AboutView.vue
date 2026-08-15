@@ -1,6 +1,7 @@
 <template>
   <div class="about">
-    <h2>Pokedex con busqueda individual de lista y comparativa entre dos</h2>
+    <h2>Pokedex con busqueda individual, de lista y comparativa entre dos</h2>
+    <p>Para acceder a los pokemon en favoritos debes registrarte/iniciar sesión</p>
   </div>
 </template>
 

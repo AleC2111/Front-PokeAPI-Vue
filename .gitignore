@@ -23,6 +23,9 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+backend/venv/*
+backend/.env
+backend/__pycache__/*
 
 *.tsbuildinfo
 
@@ -37,3 +40,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+*.db
+.env

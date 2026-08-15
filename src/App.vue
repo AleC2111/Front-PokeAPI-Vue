@@ -1,27 +1,56 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
 
-// Bookmarks de favoritos con FastAPI
+const isAuthenticated = ref(false)
+const username = ref('')
+const router = useRouter()
 
-//Extra
-// Buscar el pokemon al hacer hover en la lista
-// Usar Promise.all para los movimientos
-// Agregar metodo evolutivo a las líneas evolutivas
-// Agregar casos para formas alternativas en las líneas evolutivas (megas, regionales, etc)
-// Permita nombres sin tener que usar - (megas, regionales, etc)
+const checkAuth = () => {
+  const token = localStorage.getItem('token')
+  isAuthenticated.value = !!token
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      username.value = payload.sub
+    } catch (e) {
+      username.value = ''
+    }
+  } else {
+    username.value = ''
+  }
+}
+
+onMounted(() => {
+  checkAuth()
+  window.addEventListener('auth-change', checkAuth)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('auth-change', checkAuth)
+})
+
+const logout = () => {
+  localStorage.removeItem('token')
+  checkAuth()
+  router.push('/login')
+}
 </script>
 
 <template>
   <header>
     <div class="wrapper">
-      <HelloWorld msg="Pokedex usando PokeAPI y Vue" />
-
+      <HelloWorld msg="Buscador Pokedex" />
+      <span v-if="isAuthenticated" class="user-greeting">Hola, {{ username }}</span>
       <nav>
         <RouterLink to="/">Home</RouterLink>
         <RouterLink to="/single-search">Buscador Individual</RouterLink>
         <RouterLink to="/list-search">Buscador por Lista</RouterLink>
         <RouterLink to="/compare-search">Buscador Doble</RouterLink>
+        <RouterLink v-if="isAuthenticated" to="/favorites">Favoritos</RouterLink>
+        <RouterLink v-if="!isAuthenticated" to="/login">Login</RouterLink>
+        <a href="#" v-if="isAuthenticated" @click.prevent="logout">Logout</a>
       </nav>
     </div>
   </header>
@@ -90,5 +119,13 @@ nav a:first-of-type {
     padding: 1rem 0;
     margin-top: 1rem;
   }
+}
+
+.user-greeting {
+  display: inline-block;
+  padding: 0 10px;
+  color: var(--color-text);
+  font-weight: bold;
+  text-transform: capitalize;
 }
 </style>

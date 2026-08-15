@@ -14,25 +14,20 @@ const shiny_toggle = ref(null)
 const stats_graph = ref(null)
 const evolution_line = ref(null)
 
+const BASE_URL = 'http://localhost:8000/api'
 let currentData = { default_image: '/default-img.jpg', shiny_image: '/shiny-img.jpg' }
 let loading = ref(false)
 let timer = null
+const is_favorite = ref(false)
+const saved = ref(false)
+const removed = ref(false)
 
 function parseData(data) {
   let id = data.id
   let pokemonName = data.name
-  let stats = []
-  for (let i = 0; i < data.stats.length; i++) {
-    stats.push(data.stats[i].base_stat)
-  }
-  let abilitiesData = []
-  for (let i = 0; i < data.abilities.length; i++) {
-    abilitiesData.push(data.abilities[i].ability.name)
-  }
-  let typesData = []
-  for (let i = 0; i < data.types.length; i++) {
-    typesData.push(data.types[i].type.name)
-  }
+  let stats = data.stats.map((s) => s.base_stat)
+  let abilitiesData = data.abilities.map((a) => a.ability.name)
+  let typesData = data.types.map((t) => t.type.name)
   let height = data.height / 10
   let weight = data.weight / 10
   let moves = data.moves
@@ -40,31 +35,23 @@ function parseData(data) {
   let shiny_image = data.sprites.front_shiny
 
   currentData = {
-    id: id,
+    id,
     name: pokemonName,
     base_stats: stats,
     abilities: abilitiesData,
     types: typesData,
-    height: height,
-    weight: weight,
-    moves: moves,
-    default_image: default_image,
-    shiny_image: shiny_image,
+    height,
+    weight,
+    moves,
+    default_image,
+    shiny_image,
     favorite: false,
   }
   return currentData
 }
 
 function changeAbilitiesUI(abilities) {
-  let finalText = 'Habilidades: '
-  for (let i = 0; i < abilities.length; i++) {
-    if (i < abilities.length - 1) {
-      finalText = finalText + abilities[i] + ', '
-    } else {
-      finalText = finalText + abilities[i]
-    }
-  }
-  return finalText
+  return 'Habilidades: ' + abilities.join(', ')
 }
 
 function statsGraph(ctx, baseStats) {
@@ -97,17 +84,21 @@ function statsGraph(ctx, baseStats) {
   })
 }
 
-function changeMoveList(moveData, movesContainer) {
+async function changeMoveList(moveData, movesContainer) {
+  movesContainer.innerHTML = 'Cargando movimientos...'
+
+  const movePromises = moveData.map(async (move) => {
+    const { data, statusCode } = await useFetch(`${BASE_URL}/move/${move.move.name}`).get().json()
+    if (statusCode.value !== 200) return {}
+    return data.value
+  })
+
+  const parsedMoves = await Promise.all(movePromises)
   movesContainer.innerHTML = ''
 
-  moveData.forEach(async (move, i) => {
-    const { data, error, isFetching } = await useFetch(
-      'https://pokeapi.co/api/v2/move/' + move.move.name,
-    )
-    let parsedData = JSON.parse(data.value)
-
+  parsedMoves.forEach((parsedData) => {
     let moveElementName = document.createElement('div')
-    moveElementName.textContent = move.move.name
+    moveElementName.textContent = parsedData.name
     movesContainer.appendChild(moveElementName)
 
     let parsedMove = document.createElement('div')
@@ -121,15 +112,17 @@ function changeMoveList(moveData, movesContainer) {
       ' Prioridad: ' +
       parsedData.priority
     movesContainer.appendChild(parsedMove)
+
+    let moveDescription = document.createElement('div')
     if (parsedData.effect_entries.length !== 0) {
-      let moveDescription = document.createElement('div')
-      moveDescription.textContent = parsedData.effect_entries[1].effect
-      movesContainer.appendChild(moveDescription)
+      const entry =
+        parsedData.effect_entries.find((e) => e.language.name === 'en') ||
+        parsedData.effect_entries[0]
+      moveDescription.textContent = entry.effect
     } else {
-      let moveDescription = document.createElement('div')
       moveDescription.textContent = 'No hay descripción'
-      movesContainer.appendChild(moveDescription)
     }
+    movesContainer.appendChild(moveDescription)
 
     let blank = document.createElement('hr')
     movesContainer.appendChild(blank)
@@ -144,20 +137,28 @@ function changeShiny() {
   }
 }
 
-async function parsedEvolution(evolutionChainUrl) {
-  const { data, error, isFetching } = await useFetch(evolutionChainUrl)
-  let evolutionData = JSON.parse(data.value).chain
+async function searchEvolutionChain(evolutionChainUrl) {
+  const parts = evolutionChainUrl.split('/')
+  const id = parts[parts.length - 2]
+  const { data, statusCode } = await useFetch(`${BASE_URL}/evolution-chain/${id}`).get().json()
+  if (statusCode.value !== 200) return ''
+  return data.value.chain
+}
+
+async function parsedEvolution(evolutionChainUrl, speciesData) {
+  let evolutionData = await searchEvolutionChain(evolutionChainUrl)
+
   let baseForm = []
   let firstPhaseForm = []
   let lastPhaseForm = []
 
-  baseForm.push(evolutionData['species']['name'])
-  if (Object.hasOwn(evolutionData, 'evolves_to')) {
-    for (let i = 0; i < evolutionData['evolves_to'].length; i++) {
-      firstPhaseForm.push(evolutionData['evolves_to'][i]['species']['name'])
-      if (Object.hasOwn(evolutionData['evolves_to'][i], 'evolves_to')) {
-        for (let j = 0; j < evolutionData['evolves_to'][i]['evolves_to'].length; j++) {
-          lastPhaseForm.push(evolutionData['evolves_to'][i]['evolves_to'][j]['species']['name'])
+  baseForm.push(evolutionData.species.name)
+  if (evolutionData.evolves_to && evolutionData.evolves_to.length > 0) {
+    for (let i = 0; i < evolutionData.evolves_to.length; i++) {
+      firstPhaseForm.push(evolutionData.evolves_to[i].species.name)
+      if (evolutionData.evolves_to[i].evolves_to) {
+        for (let j = 0; j < evolutionData.evolves_to[i].evolves_to.length; j++) {
+          lastPhaseForm.push(evolutionData.evolves_to[i].evolves_to[j].species.name)
         }
       }
     }
@@ -166,9 +167,21 @@ async function parsedEvolution(evolutionChainUrl) {
   let fullLine = [baseForm]
   if (firstPhaseForm.length > 0) fullLine.push(firstPhaseForm)
   if (lastPhaseForm.length > 0) fullLine.push(lastPhaseForm)
-  console.log(fullLine)
 
-  return formatEvolutionLine(fullLine)
+  let formattedLine = formatEvolutionLine(fullLine)
+  formattedLine = formatVarieties(formattedLine, speciesData)
+
+  return formattedLine
+}
+
+function formatVarieties(formattedLine, speciesData) {
+  if (speciesData && speciesData.varieties.length > 1) {
+    const varieties = speciesData.varieties.filter((v) => !v.is_default).map((v) => v.pokemon.name)
+    if (varieties.length > 0) {
+      formattedLine += ' | Formas alternativas: ' + varieties.join(', ')
+    }
+  }
+  return formattedLine
 }
 
 function formatEvolutionLine(fullLine) {
@@ -186,21 +199,20 @@ function formatEvolutionLine(fullLine) {
       }
     }
   }
-
-  console.log(formattedLine)
   return formattedLine
 }
 
 async function updateEvolutionLine(pokemonName) {
-  const { data, error, isFetching } = await useFetch(
-    'https://pokeapi.co/api/v2/pokemon-species/' + pokemonName,
-  )
-  if (JSON.parse(data.value) === null || JSON.parse(data.value) === undefined || error) {
+  try {
+    const { data, statusCode } = await useFetch(`${BASE_URL}/pokemon-species/${pokemonName}`)
+      .get()
+      .json()
+    if (statusCode.value !== 200) return pokemonName
+    let evolutionChainUrl = data.value.evolution_chain.url
+    return await parsedEvolution(evolutionChainUrl, data.value)
+  } catch (e) {
     return pokemonName
   }
-  let evolutionChainUrl = JSON.parse(data.value).evolution_chain.url
-
-  return await parsedEvolution(evolutionChainUrl)
 }
 
 async function changeUI(parsed) {
@@ -216,23 +228,35 @@ async function changeUI(parsed) {
   height_weight.value.textContent =
     'Altura: ' + parsed.height + ' m, Peso: ' + parsed.weight + ' kg'
   evolution_line.value.textContent = await updateEvolutionLine(parsed.name)
-  changeMoveList(parsed.moves, move_list.value)
+  await changeMoveList(parsed.moves, move_list.value)
+}
+
+async function checkIsFavorite(pokemonName) {
+  const token = localStorage.getItem('token')
+  if (!token) return false
+  try {
+    const { data, statusCode } = await useFetch(`${BASE_URL}/favorites`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .get()
+      .json()
+    if (statusCode.value === 200) {
+      return data.value.some((f) => f.pokemon_name === pokemonName)
+    }
+  } catch (e) {
+    console.error(e)
+  }
+  return false
 }
 
 async function startSearch(pokemonName) {
   try {
-    let parsed
-    if (localStorage.getItem(pokemonName)) {
-      console.log(pokemonName)
-      is_favorite.value = true
-      currentData = JSON.parse(localStorage.getItem(pokemonName))
-      parsed = currentData
-    } else {
-      const { data, error, isFetching } = await useFetch(
-        'https://pokeapi.co/api/v2/pokemon/' + pokemonName,
-      )
-      parsed = parseData(JSON.parse(data.value))
-    }
+    const { data, statusCode } = await useFetch(`${BASE_URL}/pokemon/${pokemonName}`).get().json()
+    if (statusCode.value !== 200) throw new Error('Pokemon not found')
+    let parsed = parseData(data.value)
+
+    is_favorite.value = await checkIsFavorite(parsed.name)
+    currentData.favorite = is_favorite.value
 
     changeUI(parsed)
   } catch (error) {
@@ -243,37 +267,69 @@ async function startSearch(pokemonName) {
   }
 }
 
-const saved = ref(false)
-const removed = ref(false)
-const is_favorite = ref(false)
-function saveFavoritePokemon() {
-  if (pokedex_id.value.textContent !== 'Id') {
-    if (currentData['favorite'] === true) {
-      currentData['favorite'] = false
-      is_favorite.value = false
-      saved.value = false
-      removed.value = true
-      localStorage.removeItem(currentData.name)
-    } else {
-      currentData['favorite'] = true
-      is_favorite.value = true
-      saved.value = true
-      removed.value = false
-      localStorage.setItem(currentData.name, JSON.stringify(currentData))
+async function saveFavoritePokemon() {
+  if (pokedex_id.value.textContent === 'Id') {
+    alert('Busca un Pokemon primero')
+    return
+  }
+  const token = localStorage.getItem('token')
+  if (!token) {
+    alert('Debes iniciar sesión para guardar favoritos')
+    return
+  }
+
+  if (currentData.favorite) {
+    try {
+      const { statusCode } = await useFetch(`${BASE_URL}/favorites/${currentData.name}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .delete()
+        .json()
+      if (statusCode.value === 200) {
+        currentData.favorite = false
+        is_favorite.value = false
+        saved.value = false
+        removed.value = true
+      }
+    } catch (e) {
+      console.error(e)
     }
   } else {
-    alert('Busca un Pokemon primero')
+    try {
+      const { statusCode } = await useFetch(`${BASE_URL}/favorites`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+        .post(
+          JSON.stringify({
+            pokemon_name: currentData.name,
+            pokemon_data: JSON.stringify(currentData),
+          }),
+        )
+        .json()
+      if (statusCode.value === 200) {
+        currentData.favorite = true
+        is_favorite.value = true
+        saved.value = true
+        removed.value = false
+      }
+    } catch (e) {
+      console.error(e)
+    }
   }
 }
 
 watch(search_bar, (newValue, _) => {
+  if (!newValue) return
   loading.value = true
   saved.value = false
   removed.value = false
   is_favorite.value = false
   clearTimeout(timer)
   timer = setTimeout(() => {
-    startSearch(newValue.toLowerCase())
+    startSearch(newValue)
   }, 1000)
 })
 </script>
