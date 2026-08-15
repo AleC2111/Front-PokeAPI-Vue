@@ -1,4 +1,4 @@
-# Front-PokeAPI-Vue
+# Pokedex-Searcher
 
 Pokemon searcher using Vue and FastAPI
 
